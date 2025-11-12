@@ -1,19 +1,12 @@
+uniform float time;
+varying vec2 vUv;
+varying vec3 vPosition;
 uniform sampler2D uPositions;
-uniform float uSize;
-
-varying vec3 vColor;
-
+float PI = 3.141592653589793238;
 void main() {
-  // Get the position data from the texture
-  vec3 pos = texture2D(uPositions, position.xy).xyz;
-
-  // Pass position to fragment shader for coloring
-  vColor = vec3(position.xy, 0.5);
-
-  // Calculate final position
-  vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-  gl_Position = projectionMatrix * mvPosition;
-
-  // Set point size (gets smaller with distance)
-  gl_PointSize = uSize * (1.0 / -mvPosition.z);
+  vUv = uv;
+  vec4 pos = texture2D ( uPositions, uv );
+  vec4 myPosition = modelViewMatrix * vec4( pos.xyz, 1. );
+  gl_PointSize = 5. * (1. / - myPosition.z );
+  gl_Position = projectionMatrix * myPosition;
 }

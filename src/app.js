@@ -6,7 +6,7 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import simFragment from "./shaders/simFragment.glsl";
 import simVertex from "./shaders/simVertex.glsl";
 import fragment from "./shaders/fragment.glsl";
-import vertex from "./shaders/vertex.glsl";
+import vertex from "./shaders/vertexParticles.glsl";
 import GUI from "lil-gui";
 import gsap from "gsap";
 
@@ -68,7 +68,7 @@ export default class Sketch {
       magFilter: THREE.NearestFilter,
       format: THREE.RGBAFormat,
       type: THREE.FloatType,
-    });
+    } );
     return renderTarget;
   }
 
@@ -84,6 +84,7 @@ export default class Sketch {
     let geometry = new THREE.PlaneGeometry(2,2);
     
     this.data = new Float32Array(this.size * this.size * 4);
+    
 
     for (let i = 0; i < this.size; i++) {
       for (let j = 0; j < this.size; j++) {
@@ -105,14 +106,44 @@ export default class Sketch {
     this.fboMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uPositions: {value: this.fboTexture},
+        uInfo: {value: null},
         time: {value: 0},
       },
+      transparent: true,
       vertexShader: simVertex,
       fragmentShader: simFragment,
     })
 
+    this.infoarray = new Float32Array(this.size * this.size * 4);
+
+    for (let i = 0; i < this.size; i++) {
+      for (let j = 0; j < this.size; j++) {
+        let index = (i + j * this.size) * 4;
+        this.infoarray[index + 0] = 0.5 + Math.random();
+        this.infoarray[index + 1] = 0.5 + Math.random();
+        this.infoarray[index + 2] = 1.;
+        this.infoarray[index + 3] = 1.;
+      }
+    }
+  
+    this.info = new THREE.DataTexture(this.infoarray, this.size, this.size, THREE.RGBAFormat, THREE.FloatType);
+    this.info.magFilter = THREE.NearestFilter;
+    this.info.minFilter = THREE.NearestFilter;
+    this.info.needsUpdate = true;
+
+    this.fboMaterial.uniforms.uInfo.value = this.info;
+
+
+
     this.fboMesh = new THREE.Mesh(geometry, this.fboMaterial);
     this.fboScene.add(this.fboMesh);
+
+    this.renderer.setRenderTarget(this.fbo);
+    this.renderer.render(this.fboScene, this.fboCamera);
+    this.renderer.setRenderTarget(this.fbo1);
+    this.renderer.render(this.fboScene, this.fboCamera);
+    this.renderer.setRenderTarget(null);
+  
 
   }
 
@@ -132,16 +163,36 @@ export default class Sketch {
       side: THREE.DoubleSide,
       uniforms: {
         time: { value: 0 },
+        uPositions: { value: null },
         resolution: { value: new THREE.Vector4() },
       },
       vertexShader: vertex,
       fragmentShader: fragment
     });
 
-    this.geometry = new THREE.PlaneGeometry(1, 1, 1);
+    this.count = this.size**2
 
-    this.plane = new THREE.Mesh(this.geometry, this.material);
-    this.scene.add(this.plane);
+    let geometry = new THREE.BufferGeometry()
+    let positions = new Float32Array(this.count * 3)
+    let uv = new Float32Array (this.count * 2) 
+    for (let i = 0; i < this.size; i++) {
+      for (let j = 0; j < this.size; j++) {
+        let index = (i + j * this.size);
+        positions[index * 3 + 0] = Math.random()
+        positions[index * 3 + 1] = Math.random()
+        positions[index * 3 + 2] = 0
+        uv[index * 2 + 0] = i / this.size
+        uv[index * 2 + 1] = j / this.size
+
+      }
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute (positions, 3))
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+
+    this.material.uniforms.uPositions.value = this.fboTexture;
+    this.points = new THREE.Points(geometry, this.material);
+    this.scene.add(this.points);
   }
 
   addLights() {
@@ -168,11 +219,24 @@ export default class Sketch {
     if (!this.isPlaying) return;
     this.time += 0.05;
     this.material.uniforms.time.value = this.time;
+    this.fboMaterial.uniforms.time.value = this.time;
     requestAnimationFrame(this.render.bind(this));
+
+    // Ping-pong: read from fbo, write to fbo1
+    this.fboMaterial.uniforms.uPositions.value = this.fbo.texture;
+    this.fboMaterial.uniforms.uPositions.needsUpdate = true;
+    this.renderer.setRenderTarget(this.fbo1);
+    this.renderer.render(this.fboScene, this.fboCamera);
+
+    // Display particles using the newly updated positions
+    this.material.uniforms.uPositions.value = this.fbo1.texture;
+    this.material.uniforms.uPositions.needsUpdate = true;
+    this.renderer.setRenderTarget(null);
     this.renderer.render(this.scene, this.camera);
 
-    // this.renderer.setRenderTarget(null);
-    // this.renderer.render(this.fboScene, this.fboCamera);
-
+    // Swap for next frame
+    let temp = this.fbo;
+    this.fbo = this.fbo1;
+    this.fbo1 = temp;
   }
 }
