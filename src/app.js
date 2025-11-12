@@ -30,7 +30,7 @@ export default class Sketch {
       0.01,
       1000
     );
-    this.camera.position.set(0, 0, 2);
+    this.camera.position.set(0, 0, 4);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.time = 0;
 
@@ -73,13 +73,13 @@ export default class Sketch {
   }
 
   setupFBO() {
-    this.size = 128;
+    this.size = 256;
     this.fbo = this.getRenderTarget();
     this.fbo1 = this.getRenderTarget();
 
     this.fboScene = new THREE.Scene();
     this.fboCamera = new THREE.OrthographicCamera(-1,1,1,-1,-1,1);
-    this.fboCamera.position.set(0,0,0.5);
+    this.fboCamera.position.set(0, 0, .5);
     this.fboCamera.lookAt(0,0,0);
     let geometry = new THREE.PlaneGeometry(2,2);
     
